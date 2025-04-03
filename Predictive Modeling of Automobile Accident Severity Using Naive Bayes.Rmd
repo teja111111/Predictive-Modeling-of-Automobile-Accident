@@ -1,0 +1,289 @@
+---
+title: "Tejesh_Varma_Maddana_FML_Assignment_3"
+author: "Tejesh Varma Maddana"
+date: "2023-10-15"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Problem Statement
+
+***The file accidentsFull.csv contains information on 42,183 actual automobile accidents in 2001 in the United States that involved one of three levels of injury: NO INJURY, INJURY, or FATALITY. For each accident, additional information is recorded, such as day of week, weather conditions, and road type. A firm might be interested in developing a system for quickly classifying the severity of an accident based on initial reports and associated data in the system (some of which rely on GPS-assisted reporting).***
+
+***TOur goal here is to predict whether an accident just reported will involve an injury (MAX_SEV_IR = 1 or 2) or will not (MAX_SEV_IR = 0). For this purpose, create a dummy variable called INJURY that takes the value “yes” if MAX_SEV_IR = 1 or 2, and otherwise “no.”***
+
+***1. Using the information in this dataset, if an accident has just been reported and no further information is available, what should the prediction be? (INJURY = Yes or No?) Why?***
+
+
+## Data Input and Cleaning
+
+Load the required libraries and read the input file
+```{r}
+library(e1071)
+library(caret)
+```
+```{r}
+accidents <- read.csv("~/Documents/KSU/Fundamentals of Machine Learning - 64060/Assignments/3.Assignment_3/accidentsFull.csv")
+#Exploring the data given in the data-set file by using some predefined operations in R
+head(accidents, 10)
+```
+##Create a pivot table that examines INJURY as a function of the two predictors for these 24 records.
+```{r}
+accidents$INJURY = ifelse(accidents$MAX_SEV_IR>0,"yes","no")
+yes_no_counts <- table(accidents$INJURY)
+yes_no_counts
+```
+
+#Convert variables to factor
+```{r}
+for (i in c(1:dim(accidents)[2])){
+  accidents[,i] <- as.factor(accidents[,i])
+}
+head(accidents,n=24)
+```
+
+# Predict based on the majority class
+```{r}
+yes_count <- yes_no_counts["yes"]
+no_count <- yes_no_counts["no"]
+prediction <- ifelse((yes_count > no_count), "Yes", "No")
+print(paste("Prediction of the new accident: INJURY =", prediction))
+```
+```{r}
+Yes_percentage <- (yes_count/(yes_count+no_count))*100
+print(paste("The percentage of Accident being INJURY is:", round(Yes_percentage,2),"%"))
+```
+```{r}
+No_percentage <- (no_count/(yes_count+no_count))*100
+print(paste("The percentage of Accident being NO INJURY is:", round(No_percentage,2), "%"))
+```
+
+#Explanation for prediction of the new accident : Injury = Yes
+#The forecast should be INJURY = Yes if an accident has just been reported and since no additional information is available. This is because 50.88% of accidents in the sample had injuries as a result. Accordingly, there is an insufficient information in favour of injuries occurring in an accident as opposed to not. This is only a prediction, after all, and there is no assurance that anyone will be hurt in the collision. Making a more precise projection would require more details, such as the extent of the vehicles' damage and the number of injured persons.
+
+#In the absence of any other information, it is preferable to decide on the side of caution and assume that there will be injuries as a result of the an accident. This will make it more likely that emergency services will arrive quickly and that individuals who need aid for accident victims will have it when they need it.
+
+***2. Select the first 24 records in the dataset and look only at the response (INJURY) and the two predictors WEATHER_R and TRAF_CON_R. Create a pivot table that examines INJURY as a function of the two predictors for these 24 records. Use all three variables in the pivot table as rows/columns.***
+```{r}
+accidents24 <- accidents[1:24,c("INJURY","WEATHER_R","TRAF_CON_R")]
+head(accidents24)
+```
+```{r}
+dt1 <- ftable(accidents24)
+dt2 <- ftable(accidents24[,-1]) # print table only for conditions
+print("Table with all three variables:")
+dt1
+print("Table without the first variable (INJURY):")
+dt2
+```
+
+***i. Compute the exact Bayes conditional probabilities of an injury (INJURY = Yes) given the six possible combinations of the predictors.***
+
+```{r}
+# Injury = yes
+p1 = dt1[3,1] / dt2[1,1] # Injury, Weather=1 and Traf=0
+p2 = dt1[4,1] / dt2[2,1] # Injury, Weather=2, Traf=0
+p3 = dt1[3,2] / dt2[1,2] # Injury, W=1, T=1
+p4 = dt1[4,2] / dt2[2,2] # I, W=2,T=1
+p5 = dt1[3,3] / dt2[1,3] # I, W=1,T=2
+p6 = dt1[4,3]/ dt2[2,3] #I,W=2,T=2
+
+# Injury = no
+n1 = dt1[1,1] / dt2[1,1] # Weather=1 and Traf=0
+n2 = dt1[2,1] / dt2[2,1] # Weather=2, Traf=0
+n3 = dt1[1,2] / dt2[1,2] # W=1, T=1
+n4 = dt1[2,2] / dt2[2,2] # W=2,T=1
+n5 = dt1[1,3] / dt2[1,3] # W=1,T=2
+n6 = dt1[2,3] / dt2[2,3] # W=2,T=2
+# Print the conditional probabilities
+print("Conditional Probabilities given Injury = Yes:")
+print(c(p1,p2,p3,p4,p5,p6))
+print("Conditional Probabilities given Injury = No:")
+print(c(n1,n2,n3,n4,n5,n6))
+```
+
+
+***ii. Classify the 24 accidents using these probabilities and a cutoff of 0.5.***
+```{r}
+prob.inj <- rep(0,24)
+
+for (i in 1:24) {
+  print(c(accidents24$WEATHER_R[i],accidents24$TRAF_CON_R[i]))
+    if (accidents24$WEATHER_R[i] == "1") {
+      if (accidents24$TRAF_CON_R[i]=="0"){
+        prob.inj[i] = p1
+      }
+      else if (accidents24$TRAF_CON_R[i]=="1") {
+        prob.inj[i] = p3
+      }
+      else if (accidents24$TRAF_CON_R[i]=="2") {
+        prob.inj[i] = p5
+      }
+    }
+    else {
+      if (accidents24$TRAF_CON_R[i]=="0"){
+        prob.inj[i] = p2
+      }
+      else if (accidents24$TRAF_CON_R[i]=="1") {
+        prob.inj[i] = p4
+      }
+      else if (accidents24$TRAF_CON_R[i]=="2") {
+        prob.inj[i] = p6
+      }
+    }
+  }
+#Adding a new column with the probability  
+accidents24$prob.inj <- prob.inj
+#Classify using the threshold of 0.5.
+accidents24$pred.prob <- ifelse(accidents24$prob.inj>0.5, "yes", "no")
+#Print the resulting dataframe
+head(accidents24, 10)
+```
+
+
+***iii. Compute manually the naive Bayes conditional probability of an injury given WEATHER_R = 1 and TRAF_CON_R = 1.***
+```{r}
+#loading the library
+library(e1071)
+
+#ceating a naive bayes model
+naive_bayes_model <- naiveBayes(INJURY ~ WEATHER_R + TRAF_CON_R, data = accidents24)
+
+#Identify the data that we wish to use to calcul
+Data <- data.frame(WEATHER_R = "1", TRAF_CON_R = "1")
+
+# Predict the probability of "Yes" class
+prob_naive_bayes <- predict(naive_bayes_model, newdata = Data, type = "raw")
+injury_prob_naive_bayes <- prob_naive_bayes[1, "yes"]
+
+# Print the probability
+cat("Naive Bayes Conditional Probability for WEATHER_R = 1 and TRAF_CON_R = 1:\n")
+cat(injury_prob_naive_bayes, "\n")
+```
+
+
+***iV. Run a naive Bayes classifier on the 24 records and two predictors. Check the model output to obtain probabilities and classifications for all 24 records. Compare this to the exact Bayes classification. Are the resulting classifications equivalent? Is the ranking (= ordering) of observations equivalent?***
+```{r}
+
+# Load the e1071 library for naiveBayes
+library(e1071)
+
+# Create a naive Bayes model for the 24 records and two predictors
+nb_model_24 <- naiveBayes(INJURY ~ WEATHER_R + TRAF_CON_R, data = accidents24)
+
+# Predict using the naive Bayes model with the same data
+naive_bayes_predictions_24 <- predict(nb_model_24, accidents24)
+
+# Extract the probability of "Yes" class for each record
+injury_prob_naive_bayes_24 <- attr(naive_bayes_predictions_24, "probabilities")[, "yes"]
+
+# Create a vector of classifications based on a cutoff of 0.5
+classification_results_naive_bayes_24 <- ifelse(injury_prob_naive_bayes_24 > 0.5, "yes", "no")
+
+# Print the classification results
+cat("Classification Results based on Naive Bayes for 24 records:\n")
+cat(classification_results_naive_bayes_24, sep = " ")
+
+# Check if the resulting classifications are equivalent to the exact Bayes classification
+equivalent_classifications <- classification_results_naive_bayes_24 == accidents24$pred.prob
+
+# Check if the ranking (= ordering) of observations is equivalent
+equivalent_ranking <- all.equal(injury_prob_naive_bayes_24, as.numeric(accidents24["yes", , ]))
+cat("Are the classification results are equivalent?", "\n")
+print(all(equivalent_classifications))
+
+
+cat("are the ranking of observations are equivalent?", "\n")
+print(equivalent_ranking)
+
+```
+
+***3. Let us now return to the entire dataset. Partition the data into training (60%) and validation (40%).***
+***i. Run a naive Bayes classifier on the complete training set with the relevant predictors (and INJURY as the response). Note that all predictors are categorical. Show the confusion matrix.***
+```{r}
+
+set.seed(123)
+
+#splitting the data
+training_indices <- createDataPartition(accidents$INJURY, p = 0.6, list = FALSE)
+training_data <- accidents[training_indices, ]
+valid_data <- accidents[-training_indices, ]
+
+#training the naive bayes
+naive_bayes_model <- naiveBayes(INJURY ~ WEATHER_R + TRAF_CON_R, data = training_data)
+
+#generating predicitions on validation data
+predictions_valid <- predict(naive_bayes_model, newdata = valid_data)
+
+#creating a confusion matrix
+confusion_matrix <- table(predictions_valid, valid_data$INJURY)
+
+#Print the confusion matrix
+print("The confusion matrix is:")
+print(confusion_matrix)
+
+```
+
+***What is the overall error of the validation set?***
+```{r}
+#Calculating the overall error rate
+overall_error_rate <- 1 - sum(diag(confusion_matrix)) / sum(confusion_matrix)
+cat("The overall error rate is:", overall_error_rate)
+```
+
+## Analysis Summary:
+
+***1. Exact Bayes vs. Naive Bayes:***
+
+a.Both precise Bayes calculations and the use of a naïve Bayes classifier on a subset of the data were provided in the code.
+
+b. A naive Bayes classifier was trained on a subset of 24 data, and the exact Bayes probability calculations were done manually.
+
+***2. Comparison of Classifications:***
+
+a. The classifications obtained using the exact Bayes computations and the naïve Bayes model were contrasted.
+
+b. The code examined if the generated categories and the ranking (ordered) of the observations were equal.
+
+***3. Naive Bayes on Entire Dataset:***
+
+a. The code divided the dataset into training (60%) and validation (40%) sets in order to expand the analysis to the complete collection of data.
+
+b. The entire training set, including the predictors WEATHER_R and TRAF_CON_R, was used to train a naïve Bayes classifier with INJURY as the response variable. In order to assess how well the model performed on the validation set, the confusion matrix was created.
+
+***4. Overall Error Rate:***
+
+a. The proportion of misclassified cases was used to calculate the total error rate of the naive Bayes classifier on the validation set.
+
+## Conclusions :
+***1. Comparing Exact Bayes and Naive Bayes:***
+
+a. To evaluate the effectiveness of the naive Bayes model, it is helpful to compare the precise Bayes and naive Bayes classifications. The naive Bayes assumptions may not be seriously broken if the classifications are equal.
+
+***2. Naive Bayes on the Entire Dataset:*** \n
+
+a. A naive Bayes classifier's performance can be better understood by training it on the complete dataset. As a result, the model can gain knowledge from a bigger sample of data.
+
+***3. Model Evaluation with Confusion Matrix:***
+
+a. The confusion matrix is a useful tool for assessing how well the model is working. Regarding true positives, true negatives, false positives, and false negatives, it offers insights.
+
+***4. Overall Error Rate:***
+
+a. The validation set's overall error rate quantifies the model's precision. Understanding how well the model generalises to fresh, untested data is crucial.
+
+***5. Considerations for Improvement:***
+
+a. Tuning hyperparameters, looking into more predictors, and figuring out how data preprocessing processes affect model performance are all possible areas for further investigation.
+
+***In conclusion, the research offers a strong framework for analysing the naive Bayes classifier's performance on the provided dataset. A thorough review is made possible by the comparison with exact Bayes, evaluation metrics, and suggestions for improvement.***
+
+
+
+
